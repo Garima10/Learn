@@ -1,0 +1,74 @@
+/*
+- FPL Inbound call initiation Test lambda.
+- Gets call details on the basis of Calling phone number and checks whether it is "Existing Appointment" or "No Appointment" from appointmentId.
+- Returns No Appointment/Multiple Appointment Data related to Calling appointmentId
+*/
+
+//AWS Initiation
+const AWS = require('aws-sdk');
+AWS.config.update({region: 'us-east-1'});
+
+//Global Varibables declaration/initiation
+var docClient = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = (event, context, callback) => {
+    
+    //local Varibables declaration/initiation
+    var appointmentId = event['appointmentId'];
+    var appointmentDate = event['appointmentDate'];
+    var appointmentTime = event['appointmentTime'];
+    var dateTimeAvailable = false;
+    console.log("INPUT Phone number check:", appointmentId);
+    
+    if(appointmentId == null || appointmentId == '') {
+       // Get input from parameters
+       appointmentId = event['Details']['Parameters']['CustomerNumber'];
+       console.log("HERE", appointmentId);
+    }
+    
+    console.log("appointmentId UPDATED: ", appointmentId);
+    var result = { "Message" : "No appointments" };
+    
+     var params = {
+        TableName : "Reschdule_list",
+        FilterExpression: "#appointmentId = :appointmentId_val and #appointmentDate = :appointmentDate_val",
+        ExpressionAttributeNames:{
+            "#appointmentId": "appointmentId",
+            "#appointmentDate" : "appointmentDate"
+        },
+        ExpressionAttributeValues: {
+            ":appointmentId_val": appointmentId,
+            ":appointmentDate_val" : appointmentDate
+        }
+    };
+    
+    docClient.scan(params, function(err, data) {
+     
+       if (err) {
+            console.log(err, err.stack); 
+            callback(null, "Success");
+       }
+       else  { 
+            console.log("Data below");
+            if(data.Items.Count!=0){
+                for(var i=0;i<data.Items[0].appointmentTime.length;i++){
+                    if(data.Items[0].appointmentTime[i]==appointmentTime){
+                        console.log(data.Items[0].appointmentTime[i]);
+                        dateTimeAvailable = true;
+                        console.log("dateTimeAvailable: "+dateTimeAvailable)
+                        callback(null, { "Message" : "Slot Available" });
+                        break;
+                    }
+                }
+            }
+            
+            if(dateTimeAvailable==false){
+                console.log("dateTimeAvailable: "+data)
+                callback(null, data);
+            }
+       }
+    });
+    
+};
+
+
